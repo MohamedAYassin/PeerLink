@@ -43,7 +43,7 @@ const Privacy: React.FC = () => {
       </p>
       <h3 className="text-2xl font-bold mb-4">Contact Us</h3>
       <p className="text-lg text-gray-300">
-        If you have any questions about this Privacy Policy, please contact us at privacy@peerlink.com.
+        If you have any questions about this Privacy Policy, please contact us at privacy@peerlink.live.
       </p>
     </div>
   );

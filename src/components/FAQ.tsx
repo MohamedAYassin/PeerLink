@@ -24,7 +24,7 @@ const FAQ: React.FC = () => {
     },
     {
       question: "What happens if my connection is interrupted during a transfer?",
-      answer: "If your connection is interrupted, the transfer will break and will need to be redone from the beginning."
+      answer: "If your connection is interrupted, the transfer will break and will most likely need to be redone from the beginning."
     }
   ];
 
