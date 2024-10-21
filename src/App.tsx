@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Peer from 'peerjs';
-import { Upload, Download, Link, Copy, CheckCircle, RefreshCw, Info, Shield, Lock } from 'lucide-react';
+import {Upload, Download, Link, Copy, CheckCircle, RefreshCw, Info, Shield, Lock, Signal} from 'lucide-react';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import Banner from './components/Banner';
@@ -8,20 +8,26 @@ import About from './components/About';
 import FAQ from './components/FAQ';
 import Privacy from './components/Privacy';
 
+// Interface for file upload object
+interface FileUpload {
+  file: File;
+  progress: number;
+  status: 'pending' | 'uploading' | 'completed' | 'error';
+}
+
 const App: React.FC = () => {
   const [peer, setPeer] = useState<Peer | null>(null);
   const [peerId, setPeerId] = useState<string>('');
   const [status, setStatus] = useState<string>('Initializing...');
-  const [fileInput, setFileInput] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [downloadProgress, setDownloadProgress] = useState<number>(0);
   const [downloadedFiles, setDownloadedFiles] = useState<string[]>([]);
-  const [currentUploadFileName, setCurrentUploadFileName] = useState<string>('');
   const [currentDownloadFileName, setCurrentDownloadFileName] = useState<string>('');
   const [linkCopied, setLinkCopied] = useState<boolean>(false);
   const [currentView, setCurrentView] = useState<string>('home');
   const dataConnectionRef = useRef<Peer.DataConnection | null>(null);
   const fileChunksRef = useRef<{ [key: string]: ArrayBuffer[] }>({});
+  const [fileUploads, setFileUploads] = useState<FileUpload[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const initPeer = () => {
@@ -148,51 +154,78 @@ const App: React.FC = () => {
   };
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      setFileInput(e.target.files[0]);
+    if (e.target.files) {
+      const newFileUploads = Array.from(e.target.files).map(file => ({
+        file,
+        progress: 0,
+        status: 'pending' as const
+      }));
+      setFileUploads(newFileUploads);
     }
   };
 
-  const uploadFile = () => {
-    if (!fileInput || !dataConnectionRef.current) {
-      alert('Please select a file and connect to another peer first.');
+  const uploadFiles = () => {
+    if (!dataConnectionRef.current) {
+      alert('Please connect to another peer first.');
       return;
     }
 
+    fileUploads.forEach((fileUpload, index) => {
+      if (fileUpload.status === 'pending') {
+        uploadFile(fileUpload.file, index);
+      }
+    });
+  };
+
+  const uploadFile = (file: File, fileIndex: number) => {
     const chunkSize = 16 * 1024; // 16KB
-    const totalChunks = Math.ceil(fileInput.size / chunkSize);
+    const totalChunks = Math.ceil(file.size / chunkSize);
     let offset = 0;
-    setCurrentUploadFileName(fileInput.name);
-    setUploadProgress(0);
+
+    setFileUploads(prevUploads =>
+        prevUploads.map((upload, index) =>
+            index === fileIndex ? { ...upload, status: 'uploading' } : upload
+        )
+    );
 
     const sendNextChunk = () => {
-      if (offset >= fileInput.size) {
-        setUploadProgress(100);
-        setTimeout(() => {
-          setUploadProgress(0);
-          setCurrentUploadFileName('');
-        }, 1000);
+      if (offset >= file.size) {
+        setFileUploads(prevUploads =>
+            prevUploads.map((upload, index) =>
+                index === fileIndex ? { ...upload, progress: 100, status: 'completed' } : upload
+            )
+        );
         return;
       }
       const reader = new FileReader();
-      const chunk = fileInput.slice(offset, offset + chunkSize);
+      const chunk = file.slice(offset, offset + chunkSize);
       reader.onload = (event) => {
         const fileData = event.target?.result;
         const dataToSend = {
           type: 'file',
-          filename: fileInput.name,
+          filename: file.name,
           fileData: fileData,
           chunkIndex: Math.floor(offset / chunkSize),
-          totalChunks: totalChunks
+          totalChunks: totalChunks,
+          fileIndex: fileIndex
         };
         dataConnectionRef.current?.send(dataToSend);
-        const percentage = Math.floor(((offset + chunk.size) / fileInput.size) * 100);
-        setUploadProgress(percentage);
+        const percentage = Math.floor(((offset + chunk.size) / file.size) * 100);
+        setFileUploads(prevUploads =>
+            prevUploads.map((upload, index) =>
+                index === fileIndex ? { ...upload, progress: percentage } : upload
+            )
+        );
         offset += chunkSize;
         sendNextChunk();
       };
       reader.onerror = (error) => {
         setStatus('File read error: ' + error);
+        setFileUploads(prevUploads =>
+            prevUploads.map((upload, index) =>
+                index === fileIndex ? { ...upload, status: 'error' } : upload
+            )
+        );
       };
       reader.readAsArrayBuffer(chunk);
     };
@@ -250,9 +283,8 @@ const App: React.FC = () => {
     dataConnectionRef.current = null;
     fileChunksRef.current = {};
     setDownloadedFiles([]);
-    setUploadProgress(0);
+    setFileUploads([]);
     setDownloadProgress(0);
-    setCurrentUploadFileName('');
     setCurrentDownloadFileName('');
 
     setTimeout(() => {
@@ -326,28 +358,34 @@ const App: React.FC = () => {
         return (
             <>
               <div className="bg-gray-800 p-8 rounded-2xl shadow-2xl w-full max-w-md mb-8 mx-auto">
-                <h1 className="text-4xl font-extrabold mb-6 text-center bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">Peer
-                  Link</h1>
+                <h1 className="text-4xl font-extrabold mb-6 text-center bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">Peer Link</h1>
 
                 <div className="mb-6">
                   <label htmlFor="fileInput" className="block text-sm font-medium text-gray-300 mb-2">
-                    Select File
+                    Select Files
                   </label>
                   <input
                       type="file"
                       id="fileInput"
+                      ref={fileInputRef}
                       onChange={handleFileInputChange}
+                      multiple
                       className="w-full px-3 py-2 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-700 text-white"
                   />
                 </div>
 
                 <button
-                    onClick={uploadFile}
+                    onClick={() => {
+                      uploadFiles();
+                      if (fileInputRef.current) {
+                        fileInputRef.current.value = '';
+                      }
+                    }}
                     className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 px-4 rounded-md hover:from-blue-600 hover:to-purple-700 transition duration-300 flex items-center justify-center mb-6 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                    disabled={!fileInput || !dataConnectionRef.current}
+                    disabled={fileUploads.length === 0 || !dataConnectionRef.current}
                 >
                   <Upload className="mr-2" size={18}/>
-                  Share File
+                  Share Files
                 </button>
 
                 <div className="mb-6 p-4 bg-gray-700 rounded-md">
@@ -380,17 +418,22 @@ const App: React.FC = () => {
                   </button>
                 </div>
 
-                {(uploadProgress > 0 || currentUploadFileName) && (
-                    <div className="mb-6">
-                      <p className="text-sm font-medium text-gray-300 mb-1">Uploading: {currentUploadFileName}</p>
+                {fileUploads.map((fileUpload, index) => (
+                    <div key={index} className="mb-6">
+                      <p className="text-sm font-medium text-gray-300 mb-1">
+                        {fileUpload.status === 'uploading' ? 'Uploading: ' : ''}
+                        {fileUpload.file.name} ({fileUpload.status})
+                      </p>
                       <div className="w-full bg-gray-700 rounded-full h-2.5">
                         <div
-                            className="bg-blue-600 h-2.5 rounded-full transition-all duration-300 ease-in-out"
-                            style={{width: `${uploadProgress}%`}}
+                            className={`h-2.5 rounded-full transition-all duration-300 ease-in-out ${
+                                fileUpload.status === 'completed' ? 'bg-green-600' : 'bg-blue-600'
+                            }`}
+                            style={{width: `${fileUpload.progress}%`}}
                         ></div>
                       </div>
                     </div>
-                )}
+                ))}
 
                 {(downloadProgress > 0 || currentDownloadFileName) && (
                     <div className="mb-6">
@@ -437,12 +480,13 @@ const App: React.FC = () => {
                   </div>
                   <div className="bg-gray-800 p-6 rounded-lg">
                     <div className="flex items-center justify-center w-12 h-12 bg-purple-500 rounded-full mb-4">
-                      <Shield className="text-white" size={24}/>
+                      <Signal className="text-white" size={24}/>
                     </div>
-                    <h3 className="text-xl font-semibold mb-2">Privacy First</h3>
-                    <p className="text-gray-400">We don't store your files or track your transfers. Your data remains
-                      yours.</p>
+                    <h3 className="text-xl font-semibold mb-2">Seamless Uploads</h3>
+                    <p className="text-gray-400 mb-4">Upload multiple files effortlessly and continuously. Whether it’s
+                      one file or many, our platform supports smooth, uninterrupted transfers.</p>
                   </div>
+
                 </div>
               </div>
             </>
