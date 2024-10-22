@@ -12,7 +12,7 @@ const About: React.FC = () => {
         <div className="bg-gray-800 p-6 rounded-lg">
           <Shield className="text-blue-400 mb-4" size={48} />
           <h3 className="text-xl font-semibold mb-2">Secure</h3>
-          <p className="text-gray-400">End-to-end encryption ensures your files remain private and secure throughout the transfer process.</p>
+          <p className="text-gray-400">DTLS 1.3 Encryption ensures your files remain private and secure throughout the transfer process.</p>
         </div>
         <div className="bg-gray-800 p-6 rounded-lg">
           <Zap className="text-yellow-400 mb-4" size={48} />

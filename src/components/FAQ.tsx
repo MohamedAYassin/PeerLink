@@ -4,7 +4,7 @@ const FAQ: React.FC = () => {
   const faqs = [
     {
       question: "How secure is Peer Link?",
-      answer: "Peer Link uses end-to-end encryption with DTLS 1.3, ensuring that your files are secure during transfer. We don't store any of your files on our servers, and the data is transferred directly between peers."
+      answer: "Peer Link uses DTLS 1.3 encryption, ensuring that your files are secure during transfer. We don't store any of your files on our servers, and the data is transferred directly between peers."
     },
     {
       question: "Is there a file size limit?",

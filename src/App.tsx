@@ -28,46 +28,38 @@ const App: React.FC = () => {
   const fileChunksRef = useRef<{ [key: string]: ArrayBuffer[] }>({});
   const [fileUploads, setFileUploads] = useState<FileUpload[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isConnectionReady, setIsConnectionReady] = useState<boolean>(false);
 
   useEffect(() => {
     const initPeer = () => {
       const newPeer = new Peer({
         config: {
           iceServers: [
-            {url:'stun:stun01.sipphone.com'},
-            {url:'stun:stun.ekiga.net'},
-            {url:'stun:stun.fwdnet.net'},
-            {url:'stun:stun.ideasip.com'},
-            {url:'stun:stun.iptel.org'},
-            {url:'stun:stun.rixtelecom.se'},
-            {url:'stun:stun.schlund.de'},
-            {url:'stun:stun.l.google.com:19302'},
-            {url:'stun:stun1.l.google.com:19302'},
-            {url:'stun:stun2.l.google.com:19302'},
-            {url:'stun:stun3.l.google.com:19302'},
-            {url:'stun:stun4.l.google.com:19302'},
-            {url:'stun:stunserver.org'},
-            {url:'stun:stun.softjoys.com'},
-            {url:'stun:stun.voiparound.com'},
-            {url:'stun:stun.voipbuster.com'},
-            {url:'stun:stun.voipstunt.com'},
-            {url:'stun:stun.voxgratia.org'},
-            {url:'stun:stun.xten.com'},
             {
-              url: 'turn:numb.viagenie.ca',
-              credential: 'muazkh',
-              username: 'webrtc@live.com'
+              urls: "stun:164.92.231.181:3478",
+              username: "eautsvf1",
+              credential: "KdwR226uw",
             },
             {
-              url: 'turn:192.158.29.39:3478?transport=udp',
-              credential: 'JZEOEt2V3Qb0y27GRntt2u2PAYA=',
-              username: '28224511:1379330808'
+              urls: "turn:164.92.231.181:3478",
+              username: "eautsvf1",
+              credential: "KdwR226uw",
             },
             {
-              url: 'turn:192.158.29.39:3478?transport=tcp',
-              credential: 'JZEOEt2V3Qb0y27GRntt2u2PAYA=',
-              username: '28224511:1379330808'
-            }
+              urls: "turn:164.92.231.181:3478?transport=tcp",
+              username: "eautsvf1",
+              credential: "KdwR226uw",
+            },
+            {
+              urls: "turn:164.92.231.181:5349",
+              username: "eautsvf1",
+              credential: "KdwR226uw",
+            },
+            {
+              urls: "turn:164.92.231.181:5349?transport=tcp",
+              username: "eautsvf1",
+              credential: "KdwR226uw",
+            },
           ]
         },
         secure: true,
@@ -87,6 +79,7 @@ const App: React.FC = () => {
 
       newPeer.on('error', (err) => {
         setStatus('Error: ' + err.message);
+        setIsConnectionReady(false);
       });
 
       setPeer(newPeer);
@@ -105,6 +98,7 @@ const App: React.FC = () => {
     dataConnectionRef.current = conn;
     setupDataConnection(conn);
     setStatus('Connected to ' + conn.peer);
+    conn.send({ type: 'connectionReady' });
   };
 
   const setupDataConnection = (conn: Peer.DataConnection) => {
@@ -113,20 +107,27 @@ const App: React.FC = () => {
         handleReceivedFileChunk(data);
       } else if (data.type === 'progress') {
         setUploadProgress(data.percentage);
+      } else if (data.type === 'connectionReady') {
+        setIsConnectionReady(true);
+        setStatus('Connection ready');
+        conn.send({ type: 'connectionReady' });
       }
     });
 
     conn.on('open', () => {
       setStatus('Connected to ' + conn.peer);
+      conn.send({ type: 'connectionReady' });
     });
 
     conn.on('close', () => {
       setStatus('Connection closed');
       dataConnectionRef.current = null;
+      setIsConnectionReady(false);
     });
 
     conn.on('error', (err) => {
       setStatus('Connection error: ' + err.message);
+      setIsConnectionReady(false);
     });
   };
 
@@ -150,6 +151,7 @@ const App: React.FC = () => {
     });
     conn.on('error', (err) => {
       setStatus('Connection error: ' + err.message);
+      setIsConnectionReady(false);
     });
   };
 
@@ -165,8 +167,8 @@ const App: React.FC = () => {
   };
 
   const uploadFiles = () => {
-    if (!dataConnectionRef.current) {
-      alert('Please connect to another peer first.');
+    if (!dataConnectionRef.current || !isConnectionReady) {
+      alert('Please wait for the connection to be fully established before sending files.');
       return;
     }
 
@@ -286,45 +288,37 @@ const App: React.FC = () => {
     setFileUploads([]);
     setDownloadProgress(0);
     setCurrentDownloadFileName('');
+    setIsConnectionReady(false);
 
     setTimeout(() => {
       const newPeer = new Peer({
         config: {
           iceServers: [
-            {url:'stun:stun01.sipphone.com'},
-            {url:'stun:stun.ekiga.net'},
-            {url:'stun:stun.fwdnet.net'},
-            {url:'stun:stun.ideasip.com'},
-            {url:'stun:stun.iptel.org'},
-            {url:'stun:stun.rixtelecom.se'},
-            {url:'stun:stun.schlund.de'},
-            {url:'stun:stun.l.google.com:19302'},
-            {url:'stun:stun1.l.google.com:19302'},
-            {url:'stun:stun2.l.google.com:19302'},
-            {url:'stun:stun3.l.google.com:19302'},
-            {url:'stun:stun4.l.google.com:19302'},
-            {url:'stun:stunserver.org'},
-            {url:'stun:stun.softjoys.com'},
-            {url:'stun:stun.voiparound.com'},
-            {url:'stun:stun.voipbuster.com'},
-            {url:'stun:stun.voipstunt.com'},
-            {url:'stun:stun.voxgratia.org'},
-            {url:'stun:stun.xten.com'},
             {
-              url: 'turn:numb.viagenie.ca',
-              credential: 'muazkh',
-              username: 'webrtc@live.com'
+              urls: "stun:164.92.231.181:3478",
+              username: "eautsvf1",
+              credential: "KdwR226uw",
             },
             {
-              url: 'turn:192.158.29.39:3478?transport=udp',
-              credential: 'JZEOEt2V3Qb0y27GRntt2u2PAYA=',
-              username: '28224511:1379330808'
+              urls: "turn:164.92.231.181:3478",
+              username: "eautsvf1",
+              credential: "KdwR226uw",
             },
             {
-              url: 'turn:192.158.29.39:3478?transport=tcp',
-              credential: 'JZEOEt2V3Qb0y27GRntt2u2PAYA=',
-              username: '28224511:1379330808'
-            }
+              urls: "turn:164.92.231.181:3478?transport=tcp",
+              username: "eautsvf1",
+              credential: "KdwR226uw",
+            },
+            {
+              urls: "turn:164.92.231.181:5349",
+              username: "eautsvf1",
+              credential: "KdwR226uw",
+            },
+            {
+              urls: "turn:164.92.231.181:5349?transport=tcp",
+              username: "eautsvf1",
+              credential: "KdwR226uw",
+            },
           ]
         },
         secure: true,
@@ -341,6 +335,7 @@ const App: React.FC = () => {
       });
       newPeer.on('error', (err) => {
         setStatus('Error: ' + err.message);
+        setIsConnectionReady(false);
       });
       setPeer(newPeer);
     }, 1000);
@@ -382,7 +377,7 @@ const App: React.FC = () => {
                       }
                     }}
                     className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 px-4 rounded-md hover:from-blue-600 hover:to-purple-700 transition duration-300 flex items-center justify-center mb-6 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                    disabled={fileUploads.length === 0 || !dataConnectionRef.current}
+                    disabled={fileUploads.length === 0 || !dataConnectionRef.current || !isConnectionReady}
                 >
                   <Upload className="mr-2" size={18}/>
                   Share Files
@@ -467,7 +462,7 @@ const App: React.FC = () => {
                       <Lock className="text-white" size={24}/>
                     </div>
                     <h3 className="text-xl font-semibold mb-2">Secure Transfer</h3>
-                    <p className="text-gray-400">Your files are encrypted end-to-end with DTLS 1.3, ensuring maximum
+                    <p className="text-gray-400">Your files are encrypted with DTLS 1.3, ensuring
                       security during transfer.</p>
                   </div>
                   <div className="bg-gray-800 p-6 rounded-lg">
@@ -483,10 +478,9 @@ const App: React.FC = () => {
                       <Signal className="text-white" size={24}/>
                     </div>
                     <h3 className="text-xl font-semibold mb-2">Seamless Uploads</h3>
-                    <p className="text-gray-400 mb-4">Upload multiple files effortlessly and continuously. Whether it’s
+                    <p className="text-gray-400 mb-4">Upload multiple files effortlessly and continuously. Whether it's
                       one file or many, our platform supports smooth, uninterrupted transfers.</p>
                   </div>
-
                 </div>
               </div>
             </>

@@ -12,8 +12,8 @@ const Privacy: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
               <div className="bg-gray-800 p-6 rounded-lg">
                   <Shield className="text-green-400 mb-4" size={48}/>
-                  <h3 className="text-xl font-semibold mb-2">End-to-End Encryption</h3>
-                  <p className="text-gray-400">All file transfers are encrypted end-to-end using DTLS 1.3, ensuring that
+                  <h3 className="text-xl font-semibold mb-2">DTLS 1.3 Encryption</h3>
+                  <p className="text-gray-400">All file transfers are encrypted using DTLS 1.3, ensuring that
                       only the intended recipient can access the files.</p>
               </div>
               <div className="bg-gray-800 p-6 rounded-lg">
@@ -39,9 +39,7 @@ const Privacy: React.FC = () => {
           </ul>
           <h3 className="text-2xl font-bold mb-4">Third-Party Services</h3>
           <p className="text-lg mb-8 text-gray-300">
-              We use WebRTC for peer-to-peer connections, which may use STUN/TURN servers to establish connections.
-              These servers only assist in creating the connection and do not have access to the content of your
-              transfers.
+              We use WebRTC for peer-to-peer connections, utilizing our own STUN/TURN servers to establish connections. These servers only assist in creating the connection and do not have access to the content of your transfers.
           </p>
           <h3 className="text-2xl font-bold mb-4">Changes to This Policy</h3>
           <p className="text-lg mb-8 text-gray-300">
