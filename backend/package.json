@@ -1,0 +1,55 @@
+{
+  "name": "peerlink-backend",
+  "version": "2.0.0",
+  "description": "PeerLink Backend API - Optimized with Redis and Native Addons",
+  "main": "dist/src/server.js",
+  "scripts": {
+    "dev": "ts-node src/server.ts",
+    "clean": "node scripts/clean.js",
+    "build": "npm run clean && tsc && npm run copy-native",
+    "build:native": "cd src/native && node-gyp configure && node-gyp build",
+    "copy-native": "node scripts/copy-native.js",
+    "start": "node dist/src/server.js",
+    "postinstall": "prisma generate",
+    "lint": "eslint src --ext .ts",
+    "test": "echo \"No tests yet\" && exit 0",
+    "test:cluster": "node tests/cluster-test.js",
+    "test:cluster:env": "SET USE_CLUSTER=true && SET CLUSTER_NODES=http://localhost:5000,http://localhost:5001,http://localhost:5002 && node tests/cluster-test.js",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio",
+    "prisma:push": "prisma db push",
+    "prisma:seed": "ts-node prisma/seed.ts",
+    "db:reset": "prisma migrate reset",
+    "db:setup": "prisma generate && prisma migrate deploy"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.0",
+    "axios": "^1.13.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.18.2",
+    "ioredis": "^5.4.1",
+    "prisma": "^6.19.0",
+    "redis": "^4.7.0",
+    "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.9.1",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.19.25",
+    "eslint": "^9.9.1",
+    "globals": "^15.9.0",
+    "node-addon-api": "^8.2.1",
+    "node-gyp": "^10.2.0",
+    "playwright": "^1.56.1",
+    "socket.io-client": "^4.8.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.3",
+    "typescript-eslint": "^8.3.0"
+  },
+  "optionalDependencies": {
+    "node-addon-api": "^8.2.1"
+  }
+}

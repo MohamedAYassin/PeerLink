@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: peerlink
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - peerlink-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - peerlink-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    image: peerlink-backend
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/peerlink?schema=public
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - PORT=5000
+      - NODE_HOSTNAME=backend
+      - NODE_PORT=5000
+      - USE_CLUSTER=true
+      - USE_REDIS=true
+      - USE_NATIVE_ADDON=true
+      - CORS_ORIGIN=http://localhost
+    ports:
+      - "5000:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - peerlink-network
+    deploy:
+      replicas: 1
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        - VITE_BACKEND_URL=http://localhost:5000
+        - VITE_WS_URL=http://localhost:5000
+        - VITE_USE_CLUSTER=true
+        - VITE_CLUSTER_NODES=http://localhost:5000
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - peerlink-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  peerlink-network:
+    driver: bridge

@@ -1,0 +1,44 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Node {
+  id            String    @id @default(uuid())
+  hostname      String
+  port          Int
+  status        String    @default("active") // active, inactive, dead
+  role          String    @default("worker") // "master", "worker"
+  lastHeartbeat DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  sessions      Session[]
+
+  @@index([status])
+  @@index([role])
+  @@index([lastHeartbeat])
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  socketId  String   @unique
+  nodeId    String
+  clientId  String
+  node      Node     @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  metadata  Json?
+
+  @@index([clientId])
+  @@index([nodeId])
+  @@index([socketId])
+  @@index([active])
+}
