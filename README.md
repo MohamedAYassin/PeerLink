@@ -39,7 +39,7 @@ Whether you are running a single instance or a fleet of nodes across different c
 
 ![PeerLink Arch](showcase/arch.png)
 
-[**Watch the Demo Video**](showcase/demo.mp4):
+<video src="https://res.cloudinary.com/dzsfs7bkh/video/upload/v1763741453/demo_hdddqc.mp4" controls autoplay muted loop style="max-width: 100%;"></video>
 
 ---
 
