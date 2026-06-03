@@ -100,7 +100,7 @@ export class SocketHandler {
             if (socket) {
               socket.emit("transfer-failed", {
                 fileId,
-                reason: `Failed to deliver ${failedChunks.length} chunk(s) after ${MAX_RETRIES} retries. Master node may be down.`,
+                reason: `Failed to deliver ${failedChunks.length} chunk(s) after ${config.maxRetries} retries. The receiver may be unreachable.`,
                 failedChunks,
               });
               console.error(
@@ -487,13 +487,12 @@ export class SocketHandler {
                     }
                   );
 
-                  // Send acknowledgment back to sender
-                  // Note: In a multi-receiver scenario, we might get multiple ACKs.
-                  // The sender logic currently handles ACKs by chunkIndex. 
-                  // If ANY receiver ACKs, it might be considered ACKed?
-                  // Or does it need ALL? The current logic just removes from pendingAcks on first ACK.
-                  // This is a limitation of the current simple ACK system for multi-cast.
-                  // For now, we relay ACKs.
+                  // Clear pending ack — chunk was successfully forwarded to the receiver
+                  if (upload.pendingAcks) {
+                    upload.pendingAcks.delete(data.chunkIndex);
+                  }
+
+                  // Notify uploader's UI that chunk was delivered
                   await this.clusterManager.routeMessageToClient(
                     data.clientId,
                     "chunk-acknowledged",

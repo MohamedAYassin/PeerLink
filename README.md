@@ -115,7 +115,7 @@ Ensure your environment is ready for high-performance computing.
 
    ```bash
    git clone https://github.com/MohamedAYassin/PeerLink.git
-   cd peerlink
+   cd PeerLink
    ```
 2. **Backend Setup**
 

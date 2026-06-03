@@ -22,7 +22,7 @@ type TransferAction =
   | { type: "UPLOAD_COMPLETE"; fileId: string; fileName: string }
   | { type: "DOWNLOAD_CONFIRMED"; fileId: string; fileName: string }
   | { type: "FILE_TRANSFER_STARTED"; fileId: string; fileName: string }
-  | { type: "CHUNK_RECEIVED"; fileId: string; speed: number }
+  | { type: "CHUNK_RECEIVED"; fileId: string; speed: number; progress?: number }
   | { type: "DOWNLOAD_COMPLETE"; fileName: string; fileId: string }
   | { type: "DOWNLOAD_ERROR" }
   | { type: "CHUNK_ACKNOWLEDGED"; fileId: string; chunkIndex: number }
@@ -86,6 +86,7 @@ function transferReducer(state: TransferState, action: TransferAction): Transfer
     case "CHUNK_RECEIVED":
       return {
         ...state,
+        downloadProgress: typeof action.progress === "number" ? action.progress : state.downloadProgress,
         downloadSpeed: action.speed > 0 ? action.speed : state.downloadSpeed,
       };
     case "DOWNLOAD_COMPLETE":
@@ -108,7 +109,12 @@ function transferReducer(state: TransferState, action: TransferAction): Transfer
           const newMap = new Map(state.retryingChunks);
           const chunks = newMap.get(action.fileId);
           if (chunks) {
-            newMap.set(action.fileId, chunks.filter((c) => c !== action.chunkIndex));
+            const remaining = chunks.filter((c) => c !== action.chunkIndex);
+            if (remaining.length === 0) {
+              newMap.delete(action.fileId);
+            } else {
+              newMap.set(action.fileId, remaining);
+            }
           }
           return newMap;
         })(),
@@ -203,7 +209,7 @@ export const useFileTransfer = (socket: Socket | null, clientId: string, shareId
         data.fileName,
         data.totalChunks,
         {
-          onProgress: (progress) => dispatch({ type: "CHUNK_RECEIVED", fileId: data.fileId, speed: 0 }),
+          onProgress: (progress) => dispatch({ type: "CHUNK_RECEIVED", fileId: data.fileId, speed: 0, progress }),
           onComplete: () => {
             dispatch({ type: "DOWNLOAD_COMPLETE", fileName: data.fileName, fileId: data.fileId });
             endTransfer(data.fileId);

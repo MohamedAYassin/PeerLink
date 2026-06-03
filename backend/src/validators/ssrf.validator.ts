@@ -31,10 +31,14 @@ function isPrivateIPv4(ip: string): boolean {
 }
 
 function isPrivateIPv6(ip: string): boolean {
-  const segments = ip.split(":");
-  // ::1 loopback
-  if (ip === "::1" || ip.toLowerCase() === "::1") return true;
+  const normalized = ip.toLowerCase();
+  // ::1 or expanded ::1 loopback
+  if (normalized === "::1" || normalized === "0:0:0:0:0:0:0:1") return true;
+  // IPv4-mapped IPv6: ::ffff:x.x.x.x
+  const ipv4Mapped = normalized.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+  if (ipv4Mapped) return isPrivateIPv4(ipv4Mapped[1]);
   // fc00::/7 unique local
+  const segments = normalized.split(":");
   const first = parseInt(segments[0] || "0", 16);
   if ((first & 0xfe00) === 0xfc00) return true;
   // fe80::/10 link-local

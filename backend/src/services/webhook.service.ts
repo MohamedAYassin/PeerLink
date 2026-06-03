@@ -26,7 +26,7 @@ export class WebhookService {
           event,
           timestamp: new Date().toISOString(),
           data,
-        }, { timeout: 10000 });
+        }, { timeout: 10000, maxRedirects: 0 });
         console.log(`Webhook ${webhookId} delivered`);
       } catch (error) {
         console.error(`Webhook ${webhookId} failed:`, error);
