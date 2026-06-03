@@ -5,9 +5,9 @@ import { ErrorFactory } from "../utils/error.utils";
 import { validateRequired } from "../validators/input.validator";
 import { webhookService } from "../services/webhook.service";
 
-export class ShareController {
-  private clusterManager = ClusterManager.getInstance();
+const clusterManager = ClusterManager.getInstance();
 
+export const shareController = {
   async createShare(req: Request, res: Response) {
     validateRequired(req.body, ["clientId"]);
     const { clientId, shareId: customShareId } = req.body;
@@ -26,7 +26,6 @@ export class ShareController {
         .substr(2, 9)}`;
     }
 
-    // Create session object (will be stored in Redis/Memory)
     const shareSession = {
       shareId,
       createdAt: Date.now(),
@@ -42,9 +41,8 @@ export class ShareController {
       clientSession.shareId = shareId;
       await storageRepository.setClientSession(clientId, clientSession);
 
-      // Notify cluster about share creation
       try {
-        await this.clusterManager.handleShareCreate(clientId, shareId, {
+        await clusterManager.handleShareCreate(clientId, shareId, {
           clients: [clientId],
           createdAt: Date.now(),
         });
@@ -53,11 +51,8 @@ export class ShareController {
       }
     }
 
-    // Notify the creator (and potential receiver if already present in share)
-    // Usually createShare only has 1 client, but if we're recreating/updating:
     for (const cid of shareSession.clients) {
-      console.log(`Sending connection-ready to ${cid} via cluster`);
-      await this.clusterManager.routeMessageToClient(cid, "connection-ready", {
+      await clusterManager.routeMessageToClient(cid, "connection-ready", {
         shareId,
         connectedClients: shareSession.clients.length,
         message: "Share session created - Waiting for others to join",
@@ -65,7 +60,7 @@ export class ShareController {
     }
 
     res.json({ success: true, shareId, message: "Share session created" });
-  }
+  },
 
   async joinShare(req: Request, res: Response) {
     validateRequired(req.body, ["shareId", "clientId"]);
@@ -95,34 +90,19 @@ export class ShareController {
       await storageRepository.setClientSession(clientId, clientSession);
     }
 
-    // Notify all clients in the share session (including the one joining)
-    console.log(
-      `Notifying ${shareSession.clients.length} clients about join:`,
-      shareSession.clients
-    );
     for (const cid of shareSession.clients) {
-      console.log(
-        `Sending connection-ready to ${cid} (${shareSession.clients.length} clients)`
-      );
-      // Always use cluster manager to route messages via database
-      await this.clusterManager.routeMessageToClient(cid, "connection-ready", {
+      await clusterManager.routeMessageToClient(cid, "connection-ready", {
         shareId,
         connectedClients: shareSession.clients.length,
         message: "Connection ready - Ready to share files!",
       });
 
-      // Also emit client-joined-share to all clients (including self) to ensure UI sync
-      console.log(`Sending client-joined-share to ${cid}`);
-      await this.clusterManager.routeMessageToClient(
+      await clusterManager.routeMessageToClient(
         cid,
         "client-joined-share",
-        {
-          clientId,
-          shareId,
-        }
+        { clientId, shareId }
       );
     }
-    console.log(`Notified all clients in share ${shareId}`);
 
     await webhookService.triggerWebhook("share-joined", {
       shareId,
@@ -136,7 +116,5 @@ export class ShareController {
       connectedClients: shareSession.clients.length,
       message: "Joined share session",
     });
-  }
-}
-
-export const shareController = new ShareController();
+  },
+};

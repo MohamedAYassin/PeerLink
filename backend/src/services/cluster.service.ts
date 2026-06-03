@@ -546,13 +546,6 @@ export class ClusterManager {
   getNodeService() {
     return this.nodeService;
   }
-  getSessionService() {
-    return this.sessionService;
-  }
-
-  getPubSubService() {
-    return this.pubSubService;
-  }
   getNodeId() {
     return this.nodeId;
   }

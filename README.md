@@ -114,7 +114,7 @@ Ensure your environment is ready for high-performance computing.
 1. **Clone the Repository**
 
    ```bash
-   git clone https://github.com/yourusername/peerlink.git
+   git clone https://github.com/MohamedAYassin/PeerLink.git
    cd peerlink
    ```
 2. **Backend Setup**
@@ -250,6 +250,135 @@ PeerLink is designed to be flexible. Control every aspect of the system via envi
 
 ---
 
+## Clustering Guide
+
+PeerLink is designed to run as a **distributed cluster** of backend nodes behind multiple frontend instances. Nodes communicate via **Redis Pub/Sub**, with automatic leader election and cross-node message routing.
+
+### How Clustering Works
+
+1. **Leader Election**: Each backend node attempts to acquire a master lock in Redis using `SET NX` with a 15-second TTL. The node that holds the lock acts as the **Master**, handling routing decisions. If the Master goes down, another node automatically takes over within 5 seconds.
+2. **Cross-Node Routing**: When a user on Node A sends a file to a user on Node B, the system routes the signal via Redis Pub/Sub — the users never know they're on different servers.
+3. **Session State**: All sessions are persisted in PostgreSQL and cached in Redis for fast lookups. The Redis session store maps `clientId -> { nodeId, socketId }`, enabling direct worker-to-worker routing.
+4. **Frontend Load Balancing**: The frontend randomly picks from a list of backend nodes (`VITE_CLUSTER_NODES`) for initial connection. Each node handles its own connected clients.
+
+### Single Node Setup (Default)
+
+By default, PeerLink runs in standalone mode (single node, no clustering). Redis is still used for caching and session storage but not for Pub/Sub.
+
+### Multi-Node Cluster Setup
+
+#### Option A: Docker Compose (Easiest)
+
+1. **Set the backend replica count**:
+   ```bash
+   docker-compose up -d --scale backend=3
+   ```
+   This starts 3 backend nodes plus PostgreSQL, Redis, and the frontend. Each backend registers itself as a separate node in the cluster.
+
+2. **Update the frontend config** to list all backend nodes (edit `docker-compose.yml` or pass build args):
+   ```yaml
+   frontend:
+     build:
+       args:
+         - VITE_USE_CLUSTER=true
+         - VITE_CLUSTER_NODES=http://backend:5000,http://backend:5001,http://backend:5002
+   ```
+
+   With Docker Compose scaling, all replicas use port 5000 internally, so `http://backend:5000` is sufficient — Docker's internal DNS load-balances across replicas.
+
+#### Option B: Manual Setup (Bare Metal / VMs)
+
+Each backend node needs its own environment configuration.
+
+**Node 1** (`terminal 1`):**
+   ```bash
+   cd backend
+   export PORT=5000
+   export NODE_HOSTNAME=192.168.1.10   # This node's reachable IP
+   export NODE_PORT=5000
+   export USE_CLUSTER=true
+   export USE_REDIS=true
+   export REDIS_HOST=192.168.1.10      # Shared Redis instance
+   npm run dev
+   ```
+
+**Node 2** (`terminal 2` or another machine):
+   ```bash
+   cd backend
+   export PORT=5001
+   export NODE_HOSTNAME=192.168.1.11   # This node's reachable IP
+   export NODE_PORT=5001
+   export USE_CLUSTER=true
+   export USE_REDIS=true
+   export REDIS_HOST=192.168.1.10      # Same shared Redis instance
+   npm run dev
+   ```
+
+**Important**: All nodes must point to the **same Redis and PostgreSQL instances** — they share state through these services.
+
+#### Option C: Hybrid (Docker Nodes + Native Nodes)
+
+You can run some nodes in Docker and some natively, as long as they all connect to the same Redis instance and are on the same network.
+
+### Frontend Configuration for Cluster
+
+The frontend connects to the cluster via environment variables:
+
+| Variable | Example | Description |
+|---|---|---|
+| `VITE_USE_CLUSTER` | `true` | Enable cluster-aware load balancing |
+| `VITE_CLUSTER_NODES` | `http://node1:5000,http://node2:5000` | Comma-separated list of backend nodes |
+
+The frontend randomly selects a node from `VITE_CLUSTER_NODES` on connection. If a node goes down, refresh the page to get re-assigned to a live node.
+
+### Cluster Environment Variables
+
+These backend variables control clustering behavior:
+
+| Variable | Default | Description |
+|---|---|---|
+| `USE_CLUSTER` | `true` | Enable distributed cluster mode. Requires `USE_REDIS=true`. |
+| `USE_REDIS` | `true` | Required for cluster (Pub/Sub, session cache, leader election) |
+| `NODE_HOSTNAME` | `localhost` | This node's hostname/IP, **must be reachable from other nodes** |
+| `NODE_PORT` | `5000` | This node's public port |
+
+If `USE_CLUSTER=false`, the node runs in **standalone mode** — it acts as Master without Redis Pub/Sub but still uses Redis for caching (if `USE_REDIS=true`).
+
+### Verifying the Cluster
+
+Once running, open the frontend. When cluster mode is active:
+
+- The debug banner (yellow) shows **CLUSTER MODE ENABLED**
+- The bottom status bar shows **Cluster Mode** next to the node address
+- Active/total node counts appear (e.g., `Nodes: 3/3`)
+- If the Master node goes down, you'll see **Reconnecting to master…** until a new master is elected
+
+### Architecture Diagram
+
+```
+         ┌──────────────┐
+         │  Frontend A  │──┐
+         └──────────────┘  │  ┌─────────────────┐
+                           ├──│  Backend Node 1  │──┐
+         ┌──────────────┐  │  │   (Worker/Master) │  │
+         │  Frontend B  │──┤  └─────────────────┘  │
+         └──────────────┘  │                        ├──► Redis (Pub/Sub + Cache)
+                           ├──┐  ┌─────────────────┐  │
+                           │  └──│  Backend Node 2  │──┘
+                           │     │   (Worker/Master) │
+                           │     └─────────────────┘
+                           │
+                           ├──┐  ┌─────────────────┐
+                           │  └──│  Backend Node 3  │
+                           │     │   (Worker/Master) │
+                           │     └─────────────────┘
+                           │
+                           └────────── PostgreSQL
+                                    (Persistent Storage)
+```
+
+---
+
 ## Running the Application
 
 ### Development Mode
@@ -317,7 +446,7 @@ PeerLink is fully containerized and ready for production deployment using Docker
    docker-compose up -d --scale backend=3
    ```
 
-   The frontend will automatically discover the new nodes via Redis.
+   The frontend automatically discovers the new nodes via Redis.
 
 ---
 

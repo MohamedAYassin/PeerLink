@@ -3,7 +3,7 @@ import { storageRepository } from "../repositories/storage.repository";
 import { ErrorFactory } from "../utils/error.utils";
 import { config } from "../config/app.config";
 
-export class UploadController {
+export const uploadController = {
   async getUploadProgress(req: Request, res: Response) {
     const { fileId } = req.params;
     const upload = await storageRepository.getUploadState(fileId);
@@ -40,8 +40,5 @@ export class UploadController {
           ? Math.round((missingChunks.length * config.chunkSize) / speed)
           : 0,
     });
-  }
-}
-
-export const uploadController = new UploadController();
-
+  },
+};

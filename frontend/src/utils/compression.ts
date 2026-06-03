@@ -5,16 +5,9 @@
 
 import { gzipSync, gunzipSync } from 'fflate';
 
-/**
- * Compression configuration
- */
-export const COMPRESSION_CONFIG = {
-  // Compression level: 0-9 (0 = no compression, 9 = best compression)
-  // Level 6 is a good balance between speed and compression ratio
+const COMPRESSION_CONFIG = {
   level: 6,
-  // Enable compression for chunks larger than this threshold (in bytes)
-  minChunkSize: 1024, // 1KB
-  // Chunk types to compress
+  minChunkSize: 1024,
   enabled: true,
 } as const;
 

@@ -1,5 +1,6 @@
 import axios from "axios";
 import { storageRepository } from "../repositories/storage.repository";
+import { validateWebhookUrl } from "../validators/ssrf.validator";
 
 export class WebhookService {
   async triggerWebhook(event: string, data: any) {
@@ -14,11 +15,18 @@ export class WebhookService {
       }
 
       try {
+        await validateWebhookUrl(webhook.url);
+      } catch {
+        console.error(`Webhook ${webhookId} blocked (internal URL): ${webhook.url}`);
+        continue;
+      }
+
+      try {
         await axios.post(webhook.url, {
           event,
           timestamp: new Date().toISOString(),
           data,
-        });
+        }, { timeout: 10000 });
         console.log(`Webhook ${webhookId} delivered`);
       } catch (error) {
         console.error(`Webhook ${webhookId} failed:`, error);

@@ -229,50 +229,9 @@ export class RedisService {
     await this.client.del(key);
   }
 
-  // ==================== Active Connections ====================
-
-  async setActiveConnection(clientId: string, socketId: string): Promise<void> {
-    const key = `connection:${clientId}`;
-    await this.client.setEx(key, TTL.CLIENT_SESSION, socketId);
-  }
-
-  async getActiveConnection(clientId: string): Promise<string | null> {
-    const key = `connection:${clientId}`;
-    return await this.client.get(key);
-  }
-
-  async deleteActiveConnection(clientId: string): Promise<void> {
-    const key = `connection:${clientId}`;
-    await this.client.del(key);
-  }
-
   // ==================== Utility Methods ====================
-
-
 
   async disconnect(): Promise<void> {
     await this.client.quit();
-  }
-
-  async getStats(): Promise<{
-    clientSessions: number;
-    shareSessions: number;
-    uploads: number;
-    activeConnections: number;
-  }> {
-    const [clientKeys, shareKeys, uploadKeys, connectionKeys] =
-      await Promise.all([
-        this.client.keys("session:client:*"),
-        this.client.keys("session:share:*"),
-        this.client.keys("upload:*"),
-        this.client.keys("connection:*"),
-      ]);
-
-    return {
-      clientSessions: clientKeys.length,
-      shareSessions: shareKeys.length,
-      uploads: uploadKeys.length,
-      activeConnections: connectionKeys.length,
-    };
   }
 }

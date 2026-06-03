@@ -4,7 +4,7 @@ import { AppErrorClass, ErrorCode } from "../utils/error.utils";
 /**
  * Error response formatter
  */
-export function formatErrorResponse(error: any): {
+function formatErrorResponse(error: any): {
   error: {
     code: string;
     message: string;

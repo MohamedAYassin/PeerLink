@@ -30,14 +30,7 @@ export enum ErrorCode {
   SHARE_SESSION_FULL = "SHARE_SESSION_FULL",
 }
 
-export interface AppError extends Error {
-  code: ErrorCode;
-  statusCode: number;
-  details?: any;
-  isOperational: boolean;
-}
-
-export class AppErrorClass extends Error implements AppError {
+export class AppErrorClass extends Error {
   code: ErrorCode;
   statusCode: number;
   details?: any;
@@ -202,12 +195,3 @@ export async function retry<T>(
 
   throw lastError;
 }
-
-export default {
-  ErrorCode,
-  ErrorFactory,
-  AppErrorClass,
-  safeHandler,
-  asyncHandler,
-  retry,
-};

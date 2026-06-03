@@ -1,12 +1,13 @@
-import express, { Express } from "express";
+import express, { Express, Router } from "express";
 import cors from "cors";
-import healthRoutes from "./routes/health.routes";
-import statsRoutes from "./routes/stats.routes";
-import uploadRoutes from "./routes/upload.routes";    
-import webhookRoutes from "./routes/webhook.routes";
-import clusterRoutes from "./routes/cluster.routes";
-import shareRoutes from "./routes/share.routes";
+import { healthController } from "./controllers/health.controller";
+import { statsController } from "./controllers/stats.controller";
+import { uploadController } from "./controllers/upload.controller";
+import { webhookController } from "./controllers/webhook.controller";
+import { clusterController } from "./controllers/cluster.controller";
+import { shareController } from "./controllers/share.controller";
 import { errorMiddleware } from "./middleware/error.middleware";
+import { asyncHandler } from "./utils/error.utils";
 
 export const createApp = (): Express => {
   const app = express();
@@ -15,16 +16,20 @@ export const createApp = (): Express => {
   app.use(express.json());
 
   // Routes
-  app.use("/api", healthRoutes);
-  app.use("/api", statsRoutes);
-  app.use("/api", uploadRoutes);
-  app.use("/api", webhookRoutes);
-  app.use("/api", clusterRoutes);
-  app.use("/api", shareRoutes);
+  const api = Router();
+  api.get("/health", asyncHandler(healthController.getHealth));
+  api.get("/stats", asyncHandler(statsController.getStats));
+  api.get("/uploads/:fileId", asyncHandler(uploadController.getUploadProgress));
+  api.post("/webhooks", asyncHandler(webhookController.registerWebhook));
+  api.get("/cluster/nodes", asyncHandler(clusterController.getNodes));
+  api.get("/cluster/stats", asyncHandler(clusterController.getStats));
+  api.get("/cluster/master", asyncHandler(clusterController.getMaster));
+  api.post("/share/create", asyncHandler(shareController.createShare));
+  api.post("/share/join", asyncHandler(shareController.joinShare));
+  app.use("/api", api);
 
   // Error handling middleware
   app.use(errorMiddleware);
 
   return app;
 };
-

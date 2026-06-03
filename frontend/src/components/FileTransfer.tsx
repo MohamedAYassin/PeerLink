@@ -8,7 +8,6 @@ interface FileTransferProps {
   uploadFiles: () => void;
   fileUploads: FileUpload[];
   isConnectionReady: boolean;
-  hasDataConnection: boolean;
   getConnectionLink: () => string;
   copyLinkToClipboard: () => void;
   linkCopied: boolean;
@@ -28,7 +27,6 @@ const FileTransfer: React.FC<FileTransferProps> = ({
                                                      uploadFiles,
                                                      fileUploads,
                                                      isConnectionReady,
-                                                     hasDataConnection,
                                                      getConnectionLink,
                                                      copyLinkToClipboard,
                                                      linkCopied,
@@ -43,7 +41,7 @@ const FileTransfer: React.FC<FileTransferProps> = ({
                                                    }) => {
   return (
       <div className="bg-gray-800 p-8 rounded-2xl shadow-2xl w-full max-w-md mb-8 mx-auto">
-        <h1 className="text-4xl font-extrabold mb-6 text-center bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
+        <h1 className="text-4xl font-extrabold mb-6 text-center text-blue-400">
           Peer Link
         </h1>
 
@@ -61,7 +59,7 @@ const FileTransfer: React.FC<FileTransferProps> = ({
           />
         </div>
 
-        <button
+        <button type="button"
             onClick={() => {
               uploadFiles();
               if (fileInputRef.current) {
@@ -69,7 +67,7 @@ const FileTransfer: React.FC<FileTransferProps> = ({
               }
             }}
             className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 px-4 rounded-md hover:from-blue-600 hover:to-purple-700 transition duration-300 flex items-center justify-center mb-6 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            disabled={fileUploads.length === 0 || !hasDataConnection || !isConnectionReady}
+            disabled={fileUploads.length === 0 || !isConnectionReady}
         >
           <Upload className="mr-2" size={18} />
           Share Files
@@ -82,9 +80,10 @@ const FileTransfer: React.FC<FileTransferProps> = ({
                 type="text"
                 value={getConnectionLink()}
                 readOnly
+                aria-label="Connection link"
                 className="flex-grow px-3 py-2 border border-gray-600 rounded-l-md bg-gray-800 text-white text-sm focus:outline-none"
             />
-            <button
+            <button type="button"
                 onClick={copyLinkToClipboard}
                 className="bg-blue-500 text-white px-3 py-2 rounded-r-md hover:bg-blue-600 transition duration-300 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
@@ -101,7 +100,7 @@ const FileTransfer: React.FC<FileTransferProps> = ({
               Status: {status}
             </p>
           </div>
-          <button
+          <button type="button"
               onClick={resetConnection}
               className="text-blue-400 hover:text-blue-300 focus:outline-none"
               title="Reset Connection"
@@ -119,7 +118,7 @@ const FileTransfer: React.FC<FileTransferProps> = ({
         )}
 
         {fileUploads.map((fileUpload, index) => (
-            <div key={index} className="mb-6">
+            <div key={fileUpload.file.name + '-' + index} className="mb-6">
               <div className="flex items-center justify-between mb-1">
                 <p className="text-sm font-medium text-gray-300">
                   {fileUpload.status === 'uploading' ? 'Uploading: ' : ''}
@@ -161,7 +160,7 @@ const FileTransfer: React.FC<FileTransferProps> = ({
               <h3 className="text-lg font-medium text-gray-300 mb-2">Downloaded Files:</h3>
               <ul className="list-disc pl-5">
                 {downloadedFiles.map((file, index) => (
-                    <li key={index} className="text-sm text-gray-400">
+                    <li key={file + '-' + index} className="text-sm text-gray-400">
                       {file}
                     </li>
                 ))}

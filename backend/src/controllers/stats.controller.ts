@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import { storageRepository } from "../repositories/storage.repository";
 import { statsService } from "../services/stats.service";
 
-export class StatsController {
+export const statsController = {
   async getStats(req: Request, res: Response) {
     const [clients, shares, stats] = await Promise.all([
       storageRepository.getAllClientSessions(),
@@ -17,7 +17,5 @@ export class StatsController {
       activeSessions: shares.size,
       usersJoined: clientArray.length,
     });
-  }
-}
-
-export const statsController = new StatsController();
+  },
+};

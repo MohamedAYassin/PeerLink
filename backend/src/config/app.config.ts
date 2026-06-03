@@ -31,7 +31,6 @@ export const config = {
   heartbeatInterval: parseInt(process.env.HEARTBEAT_INTERVAL_SECONDS || "10") * 1000,
   logLevel: process.env.LOG_LEVEL || "warn",
   debugDb: process.env.DEBUG_DB === "true",
-  enableMetrics: process.env.ENABLE_METRICS === "true",
   useNativeAddon: process.env.USE_NATIVE_ADDON === "true",
   useRedis: process.env.USE_REDIS === "true",
   useCluster: process.env.USE_CLUSTER === "true",

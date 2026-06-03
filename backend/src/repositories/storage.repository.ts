@@ -204,12 +204,7 @@ export class StorageRepository {
     this.inMemoryStorage.activeConnections.delete(clientId);
   }
 
-  async getStats() {
-    if (this.redisService) {
-      return await this.redisService.getStats();
-    }
-    return null;
-  }
 }
+
 
 export const storageRepository = new StorageRepository();

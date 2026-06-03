@@ -6,7 +6,7 @@ const About: React.FC = () => {
     <div className="max-w-4xl mx-auto">
       <h2 className="text-3xl font-bold mb-8 text-center">About Peer Link</h2>
       <p className="text-lg mb-8 text-gray-300">
-        Peer Link is a modern, secure, and high-performance file sharing solution. We leverage advanced peer-to-peer technology and a distributed cluster architecture to ensure your files are transferred directly, quickly, and privately—without ever touching a central server.
+        Peer Link is a modern, secure, and high-performance file sharing solution. We leverage advanced peer-to-peer technology and a distributed cluster architecture to ensure your files are transferred directly, quickly, and privately - without ever touching a central server.
       </p>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
         <div className="bg-gray-800 p-6 rounded-lg">
@@ -27,7 +27,7 @@ const About: React.FC = () => {
       </div>
       <h3 className="text-2xl font-bold mb-4">Our Mission</h3>
       <p className="text-lg mb-8 text-gray-300">
-        We believe file sharing should be frictionless and private. In an age of data surveillance, Peer Link stands for user sovereignty—giving you complete control over your data with a tool that just works.
+        We believe file sharing should be frictionless and private. In an age of data surveillance, Peer Link stands for user sovereignty - giving you complete control over your data with a tool that just works.
       </p>
       <h3 className="text-2xl font-bold mb-4">Technology</h3>
       <p className="text-lg mb-8 text-gray-300">

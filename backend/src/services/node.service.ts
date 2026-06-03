@@ -77,7 +77,7 @@ export class NodeService {
    * Start heartbeat to keep node alive in cluster
    */
   private startHeartbeat(): void {
-    const interval = parseInt(process.env.HEARTBEAT_INTERVAL || '10000'); // 10 seconds default
+    const interval = parseInt(process.env.HEARTBEAT_INTERVAL_SECONDS || '10') * 1000;
 
     this.heartbeatInterval = setInterval(async () => {
       if (!this.nodeId) return;

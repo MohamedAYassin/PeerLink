@@ -1,11 +1,14 @@
 import { Request, Response } from "express";
 import { storageRepository } from "../repositories/storage.repository";
 import { validateRequired } from "../validators/input.validator";
+import { validateWebhookUrl } from "../validators/ssrf.validator";
 
-export class WebhookController {
+export const webhookController = {
   async registerWebhook(req: Request, res: Response) {
     validateRequired(req.body, ["url"]);
     const { url, events } = req.body;
+
+    await validateWebhookUrl(url);
 
     const webhookId = `webhook-${Date.now()}`;
     storageRepository.getWebhookEndpoints().set(webhookId, {
@@ -20,7 +23,5 @@ export class WebhookController {
     });
 
     res.json({ success: true, webhookId, message: "Webhook registered" });
-  }
-}
-
-export const webhookController = new WebhookController();
+  },
+};

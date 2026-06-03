@@ -49,7 +49,7 @@ const Privacy: React.FC = () => {
           <h3 className="text-2xl font-bold mb-4">Contact Us</h3>
           <p className="text-lg text-gray-300">
               If you have any questions about this site, please contact us at&nbsp;
-              <a href="mailto:contact@peerlink.app" className="text-blue-500 underline">contact@peerlink.app</a>.
+              <a href="mailto:mohamed@yassin.dev" className="text-blue-500 underline">mohamed@yassin.dev</a>.
           </p>
 
       </div>

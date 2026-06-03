@@ -5,8 +5,6 @@ import { ApiService } from "./api.service";
 class SocketService {
   private socket: Socket | null = null;
   private static instance: SocketService;
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  private discoveryInterval: any | null = null;
 
   private constructor() {
     if (config.USE_CLUSTER) {
@@ -114,10 +112,6 @@ class SocketService {
       query: { clientId }, // Pass clientId in query if backend supports it, or emit 'register' after connect
     });
 
-    return this.socket;
-  }
-
-  getSocket(): Socket | null {
     return this.socket;
   }
 

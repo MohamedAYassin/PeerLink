@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useReducer } from "react";
 import { Socket } from "socket.io-client";
 import { FileUpload, TransferFailedEvent, ChunkRetryEvent, ChunkAcknowledgedEvent } from "../types";
 import { downloadManager } from "../utils/streaming";
@@ -6,37 +6,176 @@ import { startTransfer, updateTransfer, getTransferSpeed, endTransfer } from "..
 import { compressChunk, decompressChunk } from "../utils/compression";
 import { config } from "../config/app.config";
 
+type TransferState = {
+  fileUploads: FileUpload[];
+  downloadProgress: number;
+  currentDownloadFileName: string;
+  downloadedFiles: string[];
+  uploadSpeed: number;
+  downloadSpeed: number;
+  failedUploads: Map<string, { reason: string; failedChunks: number[] }>;
+  retryingChunks: Map<string, number[]>;
+};
+
+type TransferAction =
+  | { type: "CHUNK_UPLOADED"; fileId: string; progress: number; speed: number }
+  | { type: "UPLOAD_COMPLETE"; fileId: string; fileName: string }
+  | { type: "DOWNLOAD_CONFIRMED"; fileId: string; fileName: string }
+  | { type: "FILE_TRANSFER_STARTED"; fileId: string; fileName: string }
+  | { type: "CHUNK_RECEIVED"; fileId: string; speed: number }
+  | { type: "DOWNLOAD_COMPLETE"; fileName: string; fileId: string }
+  | { type: "DOWNLOAD_ERROR" }
+  | { type: "CHUNK_ACKNOWLEDGED"; fileId: string; chunkIndex: number }
+  | { type: "TRANSFER_FAILED"; fileId: string; reason: string; failedChunks: number[] }
+  | { type: "CHUNK_RETRY"; fileId: string; chunkIndex: number }
+  | { type: "MARK_FILE_UPLOADING"; fileIndex: number; fileId: string }
+  | { type: "SET_FILE_UPLOADS"; fileUploads: FileUpload[] }
+  | { type: "DISMISS_ERROR"; fileId: string }
+  | { type: "SET_UPLOAD_SPEED"; speed: number }
+  | { type: "SET_DOWNLOAD_SPEED"; speed: number }
+  | { type: "RESET" };
+
+const initialTransferState: TransferState = {
+  fileUploads: [],
+  downloadProgress: 0,
+  currentDownloadFileName: "",
+  downloadedFiles: [],
+  uploadSpeed: 0,
+  downloadSpeed: 0,
+  failedUploads: new Map(),
+  retryingChunks: new Map(),
+};
+
+function transferReducer(state: TransferState, action: TransferAction): TransferState {
+  switch (action.type) {
+    case "CHUNK_UPLOADED":
+      return {
+        ...state,
+        fileUploads: state.fileUploads.map((f) =>
+          f.fileId === action.fileId && f.status !== "completed" && f.status !== "uploaded"
+            ? { ...f, progress: action.progress }
+            : f
+        ),
+        uploadSpeed: action.speed > 0 ? action.speed : state.uploadSpeed,
+      };
+    case "UPLOAD_COMPLETE":
+      return {
+        ...state,
+        fileUploads: state.fileUploads.map((f) =>
+          (f.fileId === action.fileId || f.file.name === action.fileName) && f.status !== "completed"
+            ? { ...f, progress: 100, status: "uploaded" as const }
+            : f
+        ),
+        uploadSpeed: 0,
+      };
+    case "DOWNLOAD_CONFIRMED":
+      return {
+        ...state,
+        fileUploads: state.fileUploads.map((f) =>
+          f.fileId === action.fileId || f.file.name === action.fileName
+            ? { ...f, progress: 100, status: "completed" as const }
+            : f
+        ),
+      };
+    case "FILE_TRANSFER_STARTED":
+      return {
+        ...state,
+        currentDownloadFileName: action.fileName,
+        downloadProgress: 0,
+      };
+    case "CHUNK_RECEIVED":
+      return {
+        ...state,
+        downloadSpeed: action.speed > 0 ? action.speed : state.downloadSpeed,
+      };
+    case "DOWNLOAD_COMPLETE":
+      return {
+        ...state,
+        downloadedFiles: [...state.downloadedFiles, action.fileName],
+        downloadSpeed: 0,
+        downloadProgress: 0,
+        currentDownloadFileName: "",
+      };
+    case "DOWNLOAD_ERROR":
+      return {
+        ...state,
+        downloadSpeed: 0,
+      };
+    case "CHUNK_ACKNOWLEDGED":
+      return {
+        ...state,
+        retryingChunks: (() => {
+          const newMap = new Map(state.retryingChunks);
+          const chunks = newMap.get(action.fileId);
+          if (chunks) {
+            newMap.set(action.fileId, chunks.filter((c) => c !== action.chunkIndex));
+          }
+          return newMap;
+        })(),
+      };
+    case "TRANSFER_FAILED":
+      return {
+        ...state,
+        failedUploads: new Map(state.failedUploads).set(action.fileId, {
+          reason: action.reason,
+          failedChunks: action.failedChunks,
+        }),
+        fileUploads: state.fileUploads.map((f) =>
+          f.fileId === action.fileId ? { ...f, status: "error" as const } : f
+        ),
+      };
+    case "CHUNK_RETRY":
+      return {
+        ...state,
+        retryingChunks: (() => {
+          const chunks = state.retryingChunks.get(action.fileId) || [];
+          if (!chunks.includes(action.chunkIndex)) {
+            return new Map(state.retryingChunks).set(action.fileId, [...chunks, action.chunkIndex]);
+          }
+          return state.retryingChunks;
+        })(),
+      };
+    case "MARK_FILE_UPLOADING":
+      return {
+        ...state,
+        fileUploads: state.fileUploads.map((f, idx) =>
+          idx === action.fileIndex ? { ...f, status: "uploading" as const, fileId: action.fileId } : f
+        ),
+      };
+    case "SET_FILE_UPLOADS":
+      return { ...state, fileUploads: action.fileUploads };
+    case "DISMISS_ERROR": {
+      const newFailedUploads = new Map(state.failedUploads);
+      newFailedUploads.delete(action.fileId);
+      return { ...state, failedUploads: newFailedUploads };
+    }
+    case "SET_UPLOAD_SPEED":
+      return { ...state, uploadSpeed: action.speed };
+    case "SET_DOWNLOAD_SPEED":
+      return { ...state, downloadSpeed: action.speed };
+    case "RESET":
+      return initialTransferState;
+    default:
+      return state;
+  }
+}
+
 export const useFileTransfer = (socket: Socket | null, clientId: string, shareId: string) => {
-  const [fileUploads, setFileUploads] = useState<FileUpload[]>([]);
-  const [downloadProgress, setDownloadProgress] = useState(0);
-  const [currentDownloadFileName, setCurrentDownloadFileName] = useState("");
-  const [downloadedFiles, setDownloadedFiles] = useState<string[]>([]);
-  const [uploadSpeed, setUploadSpeed] = useState(0);
-  const [downloadSpeed, setDownloadSpeed] = useState(0);
+  const [state, dispatch] = useReducer(transferReducer, initialTransferState);
 
-  const [useCompression] = useState(true);
+  const useCompression = true;
 
-  const uploadFileRefs = useRef<Map<string, { offset: number; file: File }>>(new Map());
-  const fileNamesRef = useRef<Map<string, string>>(new Map());
-
-  // New state for chunk acknowledgment system
-  const [failedUploads, setFailedUploads] = useState<Map<string, { reason: string; failedChunks: number[] }>>(new Map());
-  const [retryingChunks, setRetryingChunks] = useState<Map<string, number[]>>(new Map());
+  const uploadFileRefs = useRef<Map<string, { offset: number; file: File }>>(null!);
+  if (!uploadFileRefs.current) uploadFileRefs.current = new Map();
+  const fileNamesRef = useRef<Map<string, string>>(null!);
+  if (!fileNamesRef.current) fileNamesRef.current = new Map();
 
   useEffect(() => {
     if (!socket) return;
 
     const onChunkUploaded = (data: any) => {
-      setFileUploads((prev) =>
-        prev.map((f) =>
-          f.fileId === data.fileId && f.status !== 'completed' && f.status !== 'uploaded'
-            ? { ...f, progress: data.progress }
-            : f
-        )
-      );
-
       const speed = getTransferSpeed(data.fileId);
-      if (speed > 0) setUploadSpeed(speed);
+      dispatch({ type: "CHUNK_UPLOADED", fileId: data.fileId, progress: data.progress, speed });
     };
 
     const onUploadComplete = (data: any) => {
@@ -45,43 +184,29 @@ export const useFileTransfer = (socket: Socket | null, clientId: string, shareId
         uploadFileRefs.current.delete(data.fileId);
         endTransfer(data.fileId);
       }
-      setFileUploads((prev) =>
-        prev.map((f) =>
-          (f.fileId === data.fileId || f.file.name === data.fileName) && f.status !== 'completed'
-            ? { ...f, progress: 100, status: "uploaded" as const }
-            : f
-        )
-      );
-      setUploadSpeed(0);
+      dispatch({ type: "UPLOAD_COMPLETE", fileId: data.fileId, fileName: data.fileName });
     };
 
     const onDownloadConfirmed = (data: any) => {
       console.log("Download confirmed:", data.fileName);
-      setFileUploads((prev) =>
-        prev.map((f) =>
-          f.fileId === data.fileId || f.file.name === data.fileName
-            ? { ...f, progress: 100, status: "completed" as const }
-            : f
-        )
-      );
+      dispatch({ type: "DOWNLOAD_CONFIRMED", fileId: data.fileId, fileName: data.fileName });
     };
 
     const onFileTransferStarted = (data: any) => {
       console.log("File transfer started:", data.fileName);
       fileNamesRef.current.set(data.fileId, data.fileName);
 
+      dispatch({ type: "FILE_TRANSFER_STARTED", fileId: data.fileId, fileName: data.fileName });
+
       downloadManager.createDownload(
         data.fileId,
         data.fileName,
         data.totalChunks,
         {
-          onProgress: (progress) => setDownloadProgress(progress),
+          onProgress: (progress) => dispatch({ type: "CHUNK_RECEIVED", fileId: data.fileId, speed: 0 }),
           onComplete: () => {
-            setDownloadedFiles((prev) => [...prev, data.fileName]);
+            dispatch({ type: "DOWNLOAD_COMPLETE", fileName: data.fileName, fileId: data.fileId });
             endTransfer(data.fileId);
-            setDownloadSpeed(0);
-            setDownloadProgress(0);
-            setCurrentDownloadFileName("");
             fileNamesRef.current.delete(data.fileId);
 
             socket.emit("download-confirmed", {
@@ -92,14 +217,12 @@ export const useFileTransfer = (socket: Socket | null, clientId: string, shareId
           },
           onError: (error) => {
             console.error("Download error:", error);
-            setDownloadSpeed(0);
+            dispatch({ type: "DOWNLOAD_ERROR" });
           },
         }
       );
 
       startTransfer(data.fileId);
-      setCurrentDownloadFileName(data.fileName);
-      setDownloadProgress(0);
     };
 
     const onChunkReceived = async (data: any) => {
@@ -107,60 +230,32 @@ export const useFileTransfer = (socket: Socket | null, clientId: string, shareId
       if (!download) return;
 
       let chunkData = data.chunk;
-      // Handle Node.js Buffer JSON representation (from Redis Pub/Sub)
-      if (chunkData && chunkData.type === 'Buffer' && Array.isArray(chunkData.data)) {
+      if (chunkData && chunkData.type === "Buffer" && Array.isArray(chunkData.data)) {
         chunkData = new Uint8Array(chunkData.data).buffer;
       }
 
-      const decompressedChunk = useCompression
-        ? decompressChunk(chunkData)
-        : chunkData;
+      const decompressedChunk = useCompression ? decompressChunk(chunkData) : chunkData;
 
       download.addChunk(data.chunkIndex, decompressedChunk);
       updateTransfer(data.fileId, decompressedChunk.byteLength);
 
       const speed = getTransferSpeed(data.fileId);
-      if (speed > 0) setDownloadSpeed(speed);
+      dispatch({ type: "CHUNK_RECEIVED", fileId: data.fileId, speed });
     };
 
-    // Chunk acknowledged handler
     const onChunkAcknowledged = (data: ChunkAcknowledgedEvent) => {
       console.log(`Chunk ${data.chunkIndex} acknowledged for ${data.fileId}`);
-      setRetryingChunks(prev => {
-        const newMap = new Map(prev);
-        const chunks = newMap.get(data.fileId);
-        if (chunks) {
-          newMap.set(data.fileId, chunks.filter(c => c !== data.chunkIndex));
-        }
-        return newMap;
-      });
+      dispatch({ type: "CHUNK_ACKNOWLEDGED", fileId: data.fileId, chunkIndex: data.chunkIndex });
     };
 
-    // Transfer failed handler
     const onTransferFailed = async (data: TransferFailedEvent) => {
       console.error(`Transfer failed for ${data.fileId}:`, data.reason);
-
-      setFailedUploads(prev => new Map(prev).set(data.fileId, {
-        reason: data.reason,
-        failedChunks: data.failedChunks
-      }));
-
-      setFileUploads(prev => prev.map(f =>
-        f.fileId === data.fileId ? { ...f, status: 'error' as const } : f
-      ));
+      dispatch({ type: "TRANSFER_FAILED", fileId: data.fileId, reason: data.reason, failedChunks: data.failedChunks });
     };
 
-    // Chunk retry handler
     const onChunkRetry = (data: ChunkRetryEvent) => {
       console.warn(`Retrying chunk ${data.chunkIndex} for ${data.fileId} (attempt ${data.attempt})`);
-
-      setRetryingChunks(prev => {
-        const chunks = prev.get(data.fileId) || [];
-        if (!chunks.includes(data.chunkIndex)) {
-          return new Map(prev).set(data.fileId, [...chunks, data.chunkIndex]);
-        }
-        return prev;
-      });
+      dispatch({ type: "CHUNK_RETRY", fileId: data.fileId, chunkIndex: data.chunkIndex });
     };
 
     socket.on("chunk-uploaded", onChunkUploaded);
@@ -172,7 +267,6 @@ export const useFileTransfer = (socket: Socket | null, clientId: string, shareId
     socket.on("transfer-failed", onTransferFailed);
     socket.on("chunk-retry", onChunkRetry);
 
-    // Debug: Check if listeners are attached
     console.log("FileTransfer listeners attached to socket:", socket.id);
 
     return () => {
@@ -206,11 +300,7 @@ export const useFileTransfer = (socket: Socket | null, clientId: string, shareId
       uploadFileRefs.current.set(fileId, { offset: 0, file });
 
       startTransfer(fileId);
-      setFileUploads((prev) =>
-        prev.map((f, idx) =>
-          idx === fileIndex ? { ...f, status: "uploading" as const, fileId } : f
-        )
-      );
+      dispatch({ type: "MARK_FILE_UPLOADING", fileIndex, fileId });
 
       const sendChunk = async () => {
         const ref = uploadFileRefs.current.get(fileId);
@@ -244,7 +334,7 @@ export const useFileTransfer = (socket: Socket | null, clientId: string, shareId
 
           updateTransfer(fileId, arrayBuffer.byteLength);
           const speed = getTransferSpeed(fileId);
-          if (speed > 0) setUploadSpeed(speed);
+          if (speed > 0) dispatch({ type: "SET_UPLOAD_SPEED", speed });
 
           sendChunk();
         });
@@ -255,8 +345,8 @@ export const useFileTransfer = (socket: Socket | null, clientId: string, shareId
   };
 
   const initiateUploads = () => {
-    fileUploads.forEach((f, index) => {
-      if (f.status === 'pending') {
+    state.fileUploads.forEach((f, index) => {
+      if (f.status === "pending") {
         uploadFile(f.file, index);
       }
     });
@@ -264,44 +354,36 @@ export const useFileTransfer = (socket: Socket | null, clientId: string, shareId
 
   const handleFilesSelected = (files: FileList | null) => {
     if (files) {
-      const newUploads = Array.from(files).map(file => ({
+      const newUploads = Array.from(files).map((file) => ({
         file,
         progress: 0,
-        status: 'pending' as const
+        status: "pending" as const,
       }));
-      setFileUploads(newUploads);
+      dispatch({ type: "SET_FILE_UPLOADS", fileUploads: newUploads });
     }
   };
 
   const resetState = () => {
-    setFileUploads([]);
-    setDownloadProgress(0);
-    setCurrentDownloadFileName("");
-    setFailedUploads(new Map());
-    setRetryingChunks(new Map());
+    dispatch({ type: "RESET" });
   };
 
   const dismissError = (fileId: string) => {
-    setFailedUploads(prev => {
-      const newMap = new Map(prev);
-      newMap.delete(fileId);
-      return newMap;
-    });
+    dispatch({ type: "DISMISS_ERROR", fileId });
   };
 
   return {
-    fileUploads,
-    downloadProgress,
-    currentDownloadFileName,
-    downloadedFiles,
-    uploadSpeed,
-    downloadSpeed,
+    fileUploads: state.fileUploads,
+    downloadProgress: state.downloadProgress,
+    currentDownloadFileName: state.currentDownloadFileName,
+    downloadedFiles: state.downloadedFiles,
+    uploadSpeed: state.uploadSpeed,
+    downloadSpeed: state.downloadSpeed,
     handleFilesSelected,
     initiateUploads,
     resetState,
     useCompression,
-    failedUploads,
-    retryingChunks,
-    dismissError
+    failedUploads: state.failedUploads,
+    retryingChunks: state.retryingChunks,
+    dismissError,
   };
 };

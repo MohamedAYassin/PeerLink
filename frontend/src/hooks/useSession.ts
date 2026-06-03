@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from "react";
 import { socketService } from "../services/socket.service";
 import { ApiService } from "../services/api.service";
 import { BackendFeatures, ClusterStats, MasterNodeInfo } from "../types";
-import { setCompressionEnabled } from "../utils/compression";
 import { config } from "../config/app.config";
 
 export const useSession = () => {
@@ -22,9 +21,8 @@ export const useSession = () => {
   });
   const [clusterStats, setClusterStats] = useState<ClusterStats | null>(null);
   const [notifications, setNotifications] = useState<{
-    disconnect: boolean;
     join: boolean;
-  }>({ disconnect: false, join: false });
+  }>({ join: false });
 
   // Master node tracking for cluster mode
   const [masterNode, setMasterNode] = useState<MasterNodeInfo | null>(null);
@@ -143,8 +141,6 @@ export const useSession = () => {
       const data = await ApiService.getHealth();
       setBackendFeatures(data.features);
 
-      setCompressionEnabled(true);
-
       if (config.USE_CLUSTER) {
         const stats = await ApiService.getClusterStats();
         setClusterStats(stats.stats);
@@ -159,21 +155,12 @@ export const useSession = () => {
     if (!config.USE_CLUSTER) return;
 
     try {
-      const response = await fetch(`${config.BACKEND_URL}/api/cluster/master`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch master: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      
-      // Only update masterId from REST, preserve isMe/nodeId from socket if available
-      // This ensures "isMe" reflects the actual socket connection, not the REST endpoint
+      const data = await ApiService.getMaster();
       setMasterNode(prev => ({
         masterId: data.masterId,
-        isMe: prev?.nodeId ? prev.isMe : data.isMe, 
+        isMe: prev?.nodeId ? prev.isMe : data.isMe,
         nodeId: prev?.nodeId ? prev.nodeId : data.nodeId,
       }));
-      
       setMasterNodeFailed(false);
       console.log('Master node:', data.masterId?.substring(0, 8));
     } catch (error) {
@@ -239,14 +226,13 @@ export const useSession = () => {
     setShareId("");
     setStatus("Disconnected");
     setConnectedClients(0);
-  }, [shareId, clientId]);
+  }, [shareId]);
 
   return {
     socket,
     clientId,
     connected,
     status,
-    setStatus, // Expose setter if needed by file transfer hook
     shareId,
     connectedClients,
     connectedNode,

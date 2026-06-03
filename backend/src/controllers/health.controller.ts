@@ -3,7 +3,7 @@ import { config } from "../config/app.config";
 import { isNativeAddonAvailable } from "../native";
 import { ClusterManager } from "../services/cluster.service";
 
-export class HealthController {
+export const healthController = {
   async getHealth(req: Request, res: Response) {
     const clusterManager = ClusterManager.getInstance();
 
@@ -24,7 +24,5 @@ export class HealthController {
           }
         : undefined,
     });
-  }
-}
-
-export const healthController = new HealthController();
+  },
+};

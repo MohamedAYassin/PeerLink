@@ -78,8 +78,8 @@ export class StreamingDownload {
       // Create blob from chunks
       const blob = new Blob(orderedChunks, { type: 'application/octet-stream' });
       
-      console.log(`Download complete: ${this.fileName} (${formatBytes(blob.size)})`);
-      
+      console.log(`Download complete: ${this.fileName} (${(blob.size / 1024).toFixed(1)} KB)`);
+
       // Trigger download
       this.downloadBlob(blob);
       
@@ -120,47 +120,8 @@ export class StreamingDownload {
     this.receivedChunks.clear();
   }
 
-  /**
-   * Get download progress
-   */
-  getProgress(): number {
-    return Math.round((this.receivedChunks.size / this.totalChunks) * 100);
-  }
-
-  /**
-   * Get missing chunk indices
-   */
-  getMissingChunks(): number[] {
-    const missing: number[] = [];
-    for (let i = 0; i < this.totalChunks; i++) {
-      if (!this.receivedChunks.has(i)) {
-        missing.push(i);
-      }
-    }
-    return missing;
-  }
-
-  /**
-   * Check if download is complete
-   */
-  isComplete(): boolean {
-    return this.receivedChunks.size === this.totalChunks;
-  }
-
-  /**
-   * Get file info
-   */
-  getFileInfo() {
-    return {
-      fileId: this.fileId,
-      fileName: this.fileName,
-      totalChunks: this.totalChunks,
-      receivedChunks: this.receivedChunks.size,
-      progress: this.getProgress(),
-      isComplete: this.isComplete(),
-    };
-  }
 }
+
 
 /**
  * StreamingDownloadManager manages multiple concurrent downloads
@@ -198,50 +159,8 @@ export class StreamingDownloadManager {
     return this.downloads.get(fileId);
   }
 
-  /**
-   * Remove a download
-   */
-  removeDownload(fileId: string): boolean {
-    return this.downloads.delete(fileId);
-  }
-
-  /**
-   * Get all active downloads
-   */
-  getActiveDownloads(): StreamingDownload[] {
-    return Array.from(this.downloads.values()).filter(d => !d.isComplete());
-  }
-
-  /**
-   * Clear all downloads
-   */
-  clearAll() {
-    this.downloads.clear();
-  }
-
-  /**
-   * Get download statistics
-   */
-  getStats() {
-    const downloads = Array.from(this.downloads.values());
-    return {
-      total: downloads.length,
-      active: downloads.filter(d => !d.isComplete()).length,
-      completed: downloads.filter(d => d.isComplete()).length,
-    };
-  }
 }
 
-/**
- * Format bytes to human-readable format
- */
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 Bytes';
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
-}
 
 /**
  * Create a singleton instance
